@@ -41,6 +41,11 @@ def voice_query():
         return jsonify({"result": response.text})
     except Exception as e:
         return jsonify({"result": f"Error: {str(e)}"})
+    
+@app.route("/random-page")
+def random_page():
+    return render_template("random-page.html")
+
 
 if __name__ == "__main__":
     app.run(debug=True)

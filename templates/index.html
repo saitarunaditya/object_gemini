@@ -2,9 +2,9 @@
 <html>
 
 <head>
-  <link rel="manifest" href="/manifest.json">
-  <meta name="theme-color" content="#2196f3">
-    <title>Gemini Vision Assistant</title>
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#2196f3">
+    <title>Cane Vision Assistant</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <style>
         :root {
@@ -113,40 +113,6 @@
             cursor: pointer;
         }
 
-        #mic-fab {
-            position: fixed;
-            bottom: 30px;
-            right: 30px;
-            background-color: var(--primary);
-            color: white;
-            width: 60px;
-            height: 60px;
-            border-radius: 50%;
-            border: none;
-            font-size: 26px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-            cursor: pointer;
-        }
-
-        #mic-fab.listening {
-            animation: pulse 1.4s infinite;
-            background-color: #DC2626 !important;
-        }
-
-        @keyframes pulse {
-            0% {
-                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6);
-            }
-
-            70% {
-                box-shadow: 0 0 0 15px rgba(220, 38, 38, 0);
-            }
-
-            100% {
-                box-shadow: 0 0 0 0 rgba(220, 38, 38, 0);
-            }
-        }
-
         #mic-status {
             margin-top: 10px;
             font-weight: bold;
@@ -156,43 +122,32 @@
 </head>
 
 <body>
-    <h2>🎥 Gemini Vision Assistant</h2>
-
+    <h2>🎥 Cane Vision Assistant</h2>
     <div class="container">
         <video id="video" autoplay playsinline muted></video>
         <canvas id="canvas" style="display:none;"></canvas>
-
         <div class="chat-box" id="chat-box">
-            <div class="chat-msg animate-in"><span>🧠 Gemini:</span> <span
+            <div class="chat-msg animate-in"><span>🧠 Cane:</span> <span
                     class="loading-dots"><span>.</span><span>.</span><span>.</span></span></div>
         </div>
-
-        <p id="mic-status">🎤 Mic Off</p>
+        <p id="mic-status">🕐 Detecting...</p>
         <button onclick="clearChat()">⏺ Clear Chat</button>
         <button onclick="toggleTheme()">🌓 Toggle Theme</button>
     </div>
-
-    <button id="mic-fab">🎤</button>
 
     <script>
         const video = document.getElementById("video");
         const canvas = document.getElementById("canvas");
         const chatBox = document.getElementById("chat-box");
-        const micFab = document.getElementById("mic-fab");
         const micStatus = document.getElementById("mic-status");
 
-        let described = false;
-        let recognition;
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        const constraints = { video: { facingMode: isMobile ? { exact: "environment" } : "user" } };
 
-        navigator.mediaDevices.getUserMedia({ video: true })
+        navigator.mediaDevices.getUserMedia(constraints)
             .then(stream => {
                 video.srcObject = stream;
-                setTimeout(() => {
-                    if (!described) {
-                        captureAndDescribeOnce();
-                        described = true;
-                    }
-                }, 3000);
+                setTimeout(() => captureAndDescribeOnce(), 3000);
             });
 
         function appendMessage(sender, text) {
@@ -205,7 +160,7 @@
 
         function clearChat() {
             chatBox.innerHTML = "";
-            appendMessage("🧠 Gemini:", `<span class='loading-dots'><span>.</span><span>.</span><span>.</span></span>`);
+            appendMessage("🧠 Cane:", `<span class='loading-dots'><span>.</span><span>.</span><span>.</span></span>`);
         }
 
         function toggleTheme() {
@@ -220,46 +175,19 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
             canvas.toBlob(blob => {
                 const formData = new FormData();
                 formData.append("image", blob);
-
-                appendMessage("🧠 Gemini:", `<span class='loading-dots'><span>.</span><span>.</span><span>.</span></span>`);
-
+                appendMessage("🧠 Cane:", `<span class='loading-dots'><span>.</span><span>.</span><span>.</span></span>`);
+                micStatus.textContent = "🕐 Describing...";
                 fetch("/describe-once", {
                     method: "POST",
                     body: formData
                 })
                     .then(res => res.json())
                     .then(data => {
-                        chatBox.lastChild.innerHTML = `<span>🧠 Gemini:</span> ${data.result}`;
-                        speak(data.result);
-                    });
-            }, "image/jpeg");
-        }
-
-        function askQuery(query) {
-            const ctx = canvas.getContext("2d");
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            canvas.toBlob(blob => {
-                const formData = new FormData();
-                formData.append("image", blob);
-                formData.append("query", query);
-
-                appendMessage("🧠 Gemini:", `<span class='loading-dots'><span>.</span><span>.</span><span>.</span></span>`);
-
-                fetch("/voice-query", {
-                    method: "POST",
-                    body: formData
-                })
-                    .then(res => res.json())
-                    .then(data => {
-                        chatBox.lastChild.innerHTML = `<span>🧠 Gemini:</span> ${data.result}`;
-                        speak(data.result);
+                        chatBox.lastChild.innerHTML = `<span>🧠 Cane:</span> ${data.result}`;
+                        speakAndPrompt(data.result);
                     });
             }, "image/jpeg");
         }
@@ -271,54 +199,40 @@
             speechSynthesis.speak(utter);
         }
 
-        function initSpeechRecognition() {
-            recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-            recognition.lang = 'en-US';
-            recognition.interimResults = false;
-
-            recognition.onresult = function (event) {
-                const query = event.results[0][0].transcript;
-                appendMessage("🎤 You:", query);
-                askQuery(query);
-            };
-
-            recognition.onend = () => {
-                micFab.classList.remove("listening");
-                micStatus.textContent = "🎤 Mic Off";
-            };
+        function speakAndPrompt(description) {
+            const prompt = `${description}. Do you want me to check again? Say yes or no.`;
+            speak(prompt);
+            micStatus.textContent = "🎤 Listening...";
+            listenForYesNo();
         }
 
-        micFab.addEventListener("mousedown", () => {
-            initSpeechRecognition();
+        function listenForYesNo() {
+            const recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+            recognition.lang = 'en-US';
+            recognition.interimResults = false;
+            recognition.onresult = function (event) {
+                const answer = event.results[0][0].transcript.toLowerCase();
+                appendMessage("🎤 You:", answer);
+                if (answer.includes("yes")) {
+                    captureAndDescribeOnce();
+                } else {
+                    window.location.href = "/random-page";
+                }
+            };
+            recognition.onerror = () => {
+                speak("Sorry, I didn't catch that. Let's try again.");
+                listenForYesNo();
+            };
             recognition.start();
-            micStatus.textContent = "🎙 Listening...";
-            micFab.classList.add("listening");
-        });
-
-        micFab.addEventListener("mouseup", () => {
-            recognition.stop();
-        });
-
-        micFab.addEventListener("touchstart", (e) => {
-            e.preventDefault();
-            initSpeechRecognition();
-            recognition.start();
-            micStatus.textContent = "🎙 Listening...";
-            micFab.classList.add("listening");
-        });
-
-        micFab.addEventListener("touchend", (e) => {
-            e.preventDefault();
-            recognition.stop();
-        });
+        }
     </script>
-<script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('/service-worker.js')
-      .then(reg => console.log('Service Worker registered', reg))
-      .catch(err => console.error('Service Worker registration failed:', err));
-  }
-</script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js')
+                .then(reg => console.log('Service Worker registered', reg))
+                .catch(err => console.error('Service Worker registration failed:', err));
+        }
+    </script>
 </body>
 
 </html>
